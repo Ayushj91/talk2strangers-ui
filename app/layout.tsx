@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import PreviewBanner from "@/components/PreviewBanner";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -22,7 +23,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           rel="stylesheet"
         />
       </head>
-      <body className="min-h-screen bg-ink text-[#E9EAF2] font-body">{children}</body>
+      <body className="min-h-screen bg-ink text-[#E9EAF2] font-body">
+        <PreviewBanner />
+        {children}
+      </body>
     </html>
   );
 }

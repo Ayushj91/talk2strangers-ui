@@ -1309,9 +1309,18 @@ video {
   --tw-gradient-to: rgb(139 124 255 / 0) var(--tw-gradient-to-position);
   --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to);
 }
+.from-you\/10 {
+  --tw-gradient-from: rgb(139 124 255 / 0.1) var(--tw-gradient-from-position);
+  --tw-gradient-to: rgb(139 124 255 / 0) var(--tw-gradient-to-position);
+  --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to);
+}
 .via-panel {
   --tw-gradient-to: rgb(16 19 31 / 0)  var(--tw-gradient-to-position);
   --tw-gradient-stops: var(--tw-gradient-from), #10131F var(--tw-gradient-via-position), var(--tw-gradient-to);
+}
+.via-white\/\[0\.03\] {
+  --tw-gradient-to: rgb(255 255 255 / 0)  var(--tw-gradient-to-position);
+  --tw-gradient-stops: var(--tw-gradient-from), rgb(255 255 255 / 0.03) var(--tw-gradient-via-position), var(--tw-gradient-to);
 }
 .to-str {
   --tw-gradient-to: #FF7A66 var(--tw-gradient-to-position);
@@ -1327,6 +1336,9 @@ video {
 }
 .to-str\/40 {
   --tw-gradient-to: rgb(255 122 102 / 0.4) var(--tw-gradient-to-position);
+}
+.to-str\/10 {
+  --tw-gradient-to: rgb(255 122 102 / 0.1) var(--tw-gradient-to-position);
 }
 .object-cover {
   -o-object-fit: cover;
@@ -1642,6 +1654,9 @@ video {
 }
 .text-you-glow\/80 {
   color: rgb(169 155 255 / 0.8);
+}
+.text-white\/65 {
+  color: rgb(255 255 255 / 0.65);
 }
 .line-through {
   text-decoration-line: line-through;
@@ -1992,6 +2007,14 @@ textarea:focus-visible {
     grid-column: span 1 / span 1;
   }
 
+  .sm\:mt-0 {
+    margin-top: 0px;
+  }
+
+  .sm\:inline {
+    display: inline;
+  }
+
   .sm\:flex {
     display: flex;
   }
@@ -2047,6 +2070,11 @@ textarea:focus-visible {
   .sm\:text-lg {
     font-size: 1.125rem;
     line-height: 1.75rem;
+  }
+
+  .sm\:text-sm {
+    font-size: 0.875rem;
+    line-height: 1.25rem;
   }
 }
 
