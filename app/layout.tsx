@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import { Analytics } from "@vercel/analytics/next";
 import PreviewBanner from "@/components/PreviewBanner";
 import "./globals.css";
 
@@ -26,6 +27,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body className="min-h-screen bg-ink text-[#E9EAF2] font-body">
         <PreviewBanner />
         {children}
+        <Analytics />
       </body>
     </html>
   );
