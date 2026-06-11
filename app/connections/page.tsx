@@ -1,17 +1,26 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { Sparkles, Lock, Trash2, MessageCircle, X } from "lucide-react";
+import { ArrowLeft, Bookmark, Send, Sparkles, Trash2, X } from "lucide-react";
 import Nav from "@/components/Nav";
+import { REPLIES, QUESTION_REPLIES, rand, uid } from "@/lib/data";
+import { Bubble, Msg, Toasts, useToasts } from "@/components/ChatKit";
 
 type Card = { id: string; me: string; them: string; mood: string; at: number };
+type ThreadMsg = Omit<Msg, "game">;
 
 export default function ConnectionsPage() {
   const [cards, setCards] = useState<Card[]>([]);
   const [loaded, setLoaded] = useState(false);
-  const [premium, setPremium] = useState<Card | null>(null);
+  const [thread, setThread] = useState<Card | null>(null);
+  const [threadMsgs, setThreadMsgs] = useState<ThreadMsg[]>([]);
+  const [draft, setDraft] = useState("");
+  const [typing, setTyping] = useState(false);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const { toasts, push } = useToasts();
+  const sessionRef = useRef(0);
 
   useEffect(() => {
     try {
@@ -20,10 +29,88 @@ export default function ConnectionsPage() {
     setLoaded(true);
   }, []);
 
+  // autoscroll thread
+  useEffect(() => {
+    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
+  }, [threadMsgs, typing]);
+
+  const openThread = (c: Card) => {
+    setThread(c);
+    sessionRef.current += 1;
+    setTyping(false);
+    setDraft("");
+    try {
+      const saved: ThreadMsg[] = JSON.parse(localStorage.getItem(`t2s_thread_${c.id}`) ?? "[]");
+      setThreadMsgs(saved);
+    } catch {
+      setThreadMsgs([]);
+    }
+  };
+
+  const closeThread = () => {
+    setThread(null);
+    setTyping(false);
+    setDraft("");
+    sessionRef.current += 1;
+  };
+
+  const saveMsgs = useCallback((cardId: string, msgs: ThreadMsg[]) => {
+    try {
+      localStorage.setItem(`t2s_thread_${cardId}`, JSON.stringify(msgs));
+    } catch {}
+  }, []);
+
+  const send = () => {
+    if (!draft.trim() || !thread) return;
+    const text = draft.trim();
+    setDraft("");
+
+    const myMsg: ThreadMsg = { id: uid(), kind: "text", from: "me", text, tick: "sent", ts: Date.now() };
+    const s = sessionRef.current;
+
+    setThreadMsgs((prev) => {
+      const next = [...prev, myMsg];
+      saveMsgs(thread.id, next);
+      return next;
+    });
+
+    // deliver tick
+    setTimeout(() => {
+      if (sessionRef.current !== s) return;
+      setThreadMsgs((prev) => {
+        const next = prev.map((m) => (m.id === myMsg.id ? { ...m, tick: "delivered" as const } : m));
+        saveMsgs(thread.id, next);
+        return next;
+      });
+    }, 500);
+
+    // bot reply
+    setTyping(true);
+    const delay = 900 + Math.random() * 1100;
+    setTimeout(() => {
+      if (sessionRef.current !== s) return;
+      setTyping(false);
+      const reply: ThreadMsg = {
+        id: uid(),
+        kind: "text",
+        from: "them",
+        text: text.includes("?") ? rand(QUESTION_REPLIES) : rand(REPLIES),
+        ts: Date.now()
+      };
+      setThreadMsgs((prev) => {
+        const next = [...prev, reply];
+        saveMsgs(thread.id, next);
+        return next;
+      });
+    }, delay);
+  };
+
   const remove = (id: string) => {
     const next = cards.filter((c) => c.id !== id);
     setCards(next);
     localStorage.setItem("t2s_cards", JSON.stringify(next));
+    try { localStorage.removeItem(`t2s_thread_${id}`); } catch {}
+    if (thread?.id === id) closeThread();
   };
 
   return (
@@ -88,11 +175,10 @@ export default function ConnectionsPage() {
                 </p>
                 <div className="mt-4 flex gap-2">
                   <button
-                    onClick={() => setPremium(c)}
-                    className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-full px-3 py-2 text-xs font-semibold glass hover:bg-white/10"
+                    onClick={() => openThread(c)}
+                    className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-full px-3 py-2 text-xs font-semibold bg-gradient-to-r from-you/30 to-str/30 border border-white/15 hover:from-you/45 hover:to-str/45 transition-all"
                   >
-                    <MessageCircle size={13} /> Open thread
-                    <Lock size={11} className="text-gold" />
+                    <Send size={12} /> Continue chatting
                   </button>
                   <button
                     onClick={() => remove(c.id)}
@@ -108,58 +194,112 @@ export default function ConnectionsPage() {
         </div>
       </div>
 
-      {/* premium modal */}
+      {/* thread chat modal */}
       <AnimatePresence>
-        {premium && (
+        {thread && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4"
-            onClick={() => setPremium(null)}
+            className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4"
           >
             <motion.div
-              initial={{ scale: 0.92, y: 16 }}
-              animate={{ scale: 1, y: 0 }}
-              exit={{ scale: 0.92, y: 16 }}
+              initial={{ y: 80, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: 80, opacity: 0 }}
+              transition={{ type: "spring", stiffness: 360, damping: 30 }}
               onClick={(e) => e.stopPropagation()}
-              className="glass-strong rounded-3xl p-6 w-full max-w-sm text-center relative"
+              className="glass-strong flex flex-col w-full sm:max-w-lg sm:rounded-3xl overflow-hidden"
+              style={{ height: "min(680px, 100dvh)" }}
             >
-              <button
-                onClick={() => setPremium(null)}
-                className="absolute right-4 top-4 text-white/40 hover:text-white"
-                aria-label="Close"
-              >
-                <X size={18} />
-              </button>
-              <div className="mx-auto h-12 w-12 rounded-2xl bg-gold/15 flex items-center justify-center">
-                <Lock size={22} className="text-gold" />
-              </div>
-              <h3 className="mt-4 font-display font-bold text-xl">Persistent threads</h3>
-              <p className="mt-2 text-sm text-white/55 leading-relaxed">
-                Reopen the line to <span className="font-mono text-str-glow">{premium.them}</span> any
-                time with a persistent chat thread — a premium feature, coming with accounts.
-              </p>
-              <div className="mt-5 glass rounded-2xl p-4 text-left text-sm">
-                <div className="flex justify-between py-1.5">
-                  <span className="text-white/60">One connection</span>
-                  <span className="font-semibold">₹49 one-time</span>
+              {/* thread header */}
+              <div className="shrink-0 border-b border-white/5 px-4 h-14 flex items-center gap-3">
+                <button
+                  onClick={closeThread}
+                  className="p-2 -ml-1 rounded-full text-white/50 hover:text-white hover:bg-white/10"
+                  aria-label="Close"
+                >
+                  <ArrowLeft size={17} />
+                </button>
+                <div className="relative">
+                  <div className="h-8 w-8 rounded-full bg-gradient-to-br from-str to-str/40 flex items-center justify-center font-display font-bold text-ink text-sm">
+                    {thread.them[0].toUpperCase()}
+                  </div>
+                  <span className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-mint border-2 border-panel" />
                 </div>
-                <div className="flex justify-between py-1.5 border-t border-white/5">
-                  <span className="text-white/60">All connections</span>
-                  <span className="font-semibold">₹99 / month</span>
+                <div className="flex-1 min-w-0">
+                  <p className="font-mono text-sm text-str-glow truncate leading-tight">{thread.them}</p>
+                  <p className="text-[11px] text-white/35">saved connection · anonymous thread</p>
+                </div>
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <Bookmark size={14} className="text-gold fill-gold" />
+                  <span className="text-[11px] font-mono text-gold/70">saved</span>
                 </div>
               </div>
-              <button
-                disabled
-                className="mt-5 w-full rounded-full py-3 font-semibold text-ink bg-gradient-to-r from-you to-str opacity-60 cursor-not-allowed"
-              >
-                Coming soon in this preview
-              </button>
+
+              {/* messages */}
+              <div ref={scrollRef} className="flex-1 overflow-y-auto nice-scroll">
+                <div className="px-4 py-4 flex flex-col gap-2.5">
+                  {threadMsgs.length === 0 && (
+                    <motion.div
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      className="self-center text-center py-8"
+                    >
+                      <Bookmark size={22} className="mx-auto text-gold/50 mb-3" />
+                      <p className="text-sm text-white/50 font-medium">
+                        This line is still open with{" "}
+                        <span className="font-mono text-str-glow">{thread.them}</span>.
+                      </p>
+                      <p className="text-xs text-white/30 mt-1">Say something.</p>
+                    </motion.div>
+                  )}
+                  <AnimatePresence initial={false}>
+                    {threadMsgs.map((m) => (
+                      <Bubble key={m.id} msg={m as Msg} />
+                    ))}
+                    {typing && (
+                      <motion.div
+                        key="typing"
+                        initial={{ opacity: 0, y: 6 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0 }}
+                        className="self-start glass rounded-2xl rounded-bl-sm px-3.5 py-2.5 flex gap-1"
+                      >
+                        {[0, 1, 2].map((i) => (
+                          <span key={i} className="typing-dot h-1.5 w-1.5 rounded-full bg-str-glow" />
+                        ))}
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
+              </div>
+
+              {/* composer */}
+              <div className="shrink-0 border-t border-white/5 bg-panel/70 backdrop-blur-xl px-4 py-3 flex items-end gap-2">
+                <input
+                  value={draft}
+                  onChange={(e) => setDraft(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && send()}
+                  placeholder={`Message ${thread.them}…`}
+                  className="flex-1 bg-white/5 border border-white/10 rounded-full px-4 py-2.5 text-[15px] placeholder:text-white/30 focus:border-you/50 outline-none min-w-0"
+                />
+                <motion.button
+                  whileTap={{ scale: 0.92 }}
+                  onClick={send}
+                  disabled={!draft.trim()}
+                  className="p-2.5 rounded-full bg-gradient-to-r from-you to-str text-ink disabled:opacity-30 shrink-0"
+                  aria-label="Send"
+                >
+                  <Send size={17} />
+                </motion.button>
+              </div>
             </motion.div>
           </motion.div>
         )}
       </AnimatePresence>
+
+      <Toasts toasts={toasts} />
     </main>
   );
 }

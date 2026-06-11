@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
-  ArrowLeft, Dices, Flag, ImagePlus, Send, SkipForward, LogOut,
+  ArrowLeft, Bookmark, Dices, Flag, ImagePlus, Send, SkipForward, LogOut,
   Sparkles, X, Lightbulb, HelpCircle
 } from "lucide-react";
 import {
@@ -26,6 +26,7 @@ export default function ChatPage() {
   const [nudge, setNudge] = useState<string | null>(null);
   const [gameMenu, setGameMenu] = useState(false);
   const [cardState, setCardState] = useState<"ask" | "waiting" | "mutual">("ask");
+  const [saveNudge, setSaveNudge] = useState<"idle" | "sent" | "accepted" | "declined">("idle");
   const { toasts, push } = useToasts();
 
   const fileRef = useRef<HTMLInputElement>(null);
@@ -123,6 +124,7 @@ export default function ChatPage() {
     mediaTrustOut.current = false;
     nudgeUsed.current = false;
     setNudge(null);
+    setSaveNudge("idle");
     setTyping(false);
     const handle = makeHandle();
     setStranger(handle);
@@ -148,12 +150,43 @@ export default function ChatPage() {
   };
 
   const leave = () => {
+    if (saveNudge === "accepted") {
+      window.location.href = "/connections";
+      return;
+    }
     if (msgs.filter((x) => x.from !== "system").length >= 2) {
       setCardState("ask");
       setStage("card");
     } else {
       window.location.href = "/";
     }
+  };
+
+  const sendSaveNudge = () => {
+    if (saveNudge !== "idle" || stage !== "chat") return;
+    setSaveNudge("sent");
+    add({ kind: "system", from: "system", text: `you nudged ${stranger} to save this chat ✦` });
+    later(2800, () => {
+      const accepted = Math.random() < 0.75;
+      if (accepted) {
+        setSaveNudge("accepted");
+        try {
+          const cards = JSON.parse(localStorage.getItem("t2s_cards") ?? "[]");
+          const dup = cards.some((c: { me: string; them: string }) => c.me === me && c.them === stranger);
+          if (!dup) {
+            cards.unshift({ id: uid(), me, them: stranger, mood, at: Date.now() });
+            localStorage.setItem("t2s_cards", JSON.stringify(cards));
+          }
+        } catch {}
+        add({ kind: "system", from: "system", text: `${stranger} said yes — connection card saved ✓` });
+        push("Card saved! Find them in Connections →");
+      } else {
+        setSaveNudge("declined");
+        add({ kind: "system", from: "system", text: `${stranger} passed — that's okay` });
+        push("They passed on saving this one");
+        later(3000, () => setSaveNudge("idle"));
+      }
+    });
   };
 
   // stranger occasionally leaves on their own
@@ -494,6 +527,23 @@ export default function ChatPage() {
             </p>
           </div>
           <div className="flex items-center gap-1 shrink-0">
+            <IconBtn
+              label={
+                saveNudge === "accepted"
+                  ? "Chat saved to connections"
+                  : saveNudge === "sent"
+                  ? "Waiting for their response…"
+                  : "Nudge to save this chat"
+              }
+              onClick={sendSaveNudge}
+              active={saveNudge === "accepted"}
+              disabled={saveNudge === "sent" || saveNudge === "accepted"}
+            >
+              <Bookmark
+                size={17}
+                className={saveNudge === "accepted" ? "fill-gold text-gold" : ""}
+              />
+            </IconBtn>
             <IconBtn label="Report & disconnect" onClick={report} danger>
               <Flag size={17} />
             </IconBtn>
@@ -547,6 +597,49 @@ export default function ChatPage() {
           </AnimatePresence>
         </div>
       </div>
+
+      {/* save nudge status bar */}
+      <AnimatePresence>
+        {saveNudge === "sent" && stage === "chat" && (
+          <motion.div
+            initial={{ opacity: 0, y: 24 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 24 }}
+            className="mx-auto max-w-3xl w-full px-3 sm:px-6 pb-2"
+          >
+            <div className="glass-strong rounded-2xl p-3.5 flex items-center gap-3 border-gold/30">
+              <span className="relative flex h-2 w-2 shrink-0">
+                <span className="absolute h-full w-full rounded-full bg-gold animate-ping opacity-60" />
+                <span className="relative h-2 w-2 rounded-full bg-gold" />
+              </span>
+              <p className="text-sm text-white/80 flex-1 leading-snug">
+                Nudge sent — waiting for <span className="font-mono text-str-glow">{stranger}</span> to respond…
+              </p>
+            </div>
+          </motion.div>
+        )}
+        {saveNudge === "accepted" && stage === "chat" && (
+          <motion.div
+            initial={{ opacity: 0, y: 24 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 24 }}
+            className="mx-auto max-w-3xl w-full px-3 sm:px-6 pb-2"
+          >
+            <div className="glass-strong rounded-2xl p-3.5 flex items-center gap-3 border-gold/30">
+              <Bookmark size={16} className="text-gold fill-gold shrink-0" />
+              <p className="text-sm text-white/80 flex-1 leading-snug">
+                Card saved with <span className="font-mono text-str-glow">{stranger}</span> — you can come back to this.
+              </p>
+              <a
+                href="/connections"
+                className="text-xs font-semibold rounded-full px-3 py-1.5 bg-gold text-ink shrink-0"
+              >
+                View
+              </a>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* nudge question */}
       <AnimatePresence>
@@ -732,22 +825,31 @@ function IconBtn({
   label,
   onClick,
   danger,
-  solid
+  solid,
+  active,
+  disabled
 }: {
   children: React.ReactNode;
   label: string;
   onClick: () => void;
   danger?: boolean;
   solid?: boolean;
+  active?: boolean;
+  disabled?: boolean;
 }) {
   return (
     <motion.button
-      whileTap={{ scale: 0.9 }}
-      onClick={onClick}
+      whileTap={disabled ? {} : { scale: 0.9 }}
+      onClick={disabled ? undefined : onClick}
       title={label}
       aria-label={label}
+      aria-disabled={disabled}
       className={`p-2.5 rounded-full transition-colors shrink-0 ${
-        danger
+        disabled
+          ? "text-white/25 cursor-default"
+          : active
+          ? "text-gold bg-gold/15"
+          : danger
           ? "text-white/55 hover:text-str hover:bg-str/15"
           : solid
           ? "glass text-white/60 hover:text-white hover:bg-white/10"

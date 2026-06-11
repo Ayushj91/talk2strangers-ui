@@ -26,6 +26,7 @@ const DEMO_SCRIPT: { from: "a" | "b"; text: string }[] = [
 function HeroDemo() {
   const [count, setCount] = useState(0);
   const [typing, setTyping] = useState<null | "a" | "b">(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     let alive = true;
@@ -57,6 +58,11 @@ function HeroDemo() {
     };
   }, []);
 
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (el) el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
+  }, [count, typing]);
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 24 }}
@@ -74,7 +80,7 @@ function HeroDemo() {
         </div>
         <span className="text-[10px] font-mono text-white/30">nothing is stored</span>
       </div>
-      <div className="flex flex-col gap-2.5 pt-4 min-h-[290px]">
+      <div ref={scrollRef} className="flex flex-col gap-2.5 pt-4 h-[290px] overflow-y-auto no-scrollbar">
         <AnimatePresence initial={false}>
           {DEMO_SCRIPT.slice(0, count).map((m, idx) => (
             <motion.div
