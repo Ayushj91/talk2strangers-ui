@@ -622,6 +622,9 @@ video {
 .top-\[820px\] {
   top: 820px;
 }
+.right-2 {
+  right: 0.5rem;
+}
 .z-10 {
   z-index: 10;
 }
@@ -1115,6 +1118,9 @@ video {
 .rounded-xl {
   border-radius: 0.75rem;
 }
+.rounded-md {
+  border-radius: 0.375rem;
+}
 .rounded-bl-sm {
   border-bottom-left-radius: 0.125rem;
 }
@@ -1464,6 +1470,10 @@ video {
 .py-4 {
   padding-top: 1rem;
   padding-bottom: 1rem;
+}
+.px-10 {
+  padding-left: 2.5rem;
+  padding-right: 2.5rem;
 }
 .pb-16 {
   padding-bottom: 4rem;
@@ -1937,6 +1947,10 @@ textarea:focus-visible {
 .hover\:text-white:hover {
   --tw-text-opacity: 1;
   color: rgb(255 255 255 / var(--tw-text-opacity, 1));
+}
+
+.hover\:text-white\/80:hover {
+  color: rgb(255 255 255 / 0.8);
 }
 
 .hover\:underline:hover {
